@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gale–Shapley-algoritmus – középiskolai felvételi szemléltetés</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body data-theme="dark" class="bg-base-100 text-base-content min-h-screen">
+  <header class="bg-primary text-primary-content px-6 py-5 shadow-lg">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold">Gale–Shapley-algoritmus szemléltetése</h1>
+        <p class="opacity-90 mt-1">Magyar középiskolai felvételi eljárás: 3 iskola, 21 diák, kölcsönös rangsorok, stabil párosítás</p>
+      </div>
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-sm btn-ghost">
+          Téma
+          <svg width="12px" height="12px" class="inline-block h-3 w-3 fill-current opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048">
+            <path d="M1799 349l242 241-1017 1017L7 590l242-241 775 775 775-775z"></path>
+          </svg>
+        </div>
+        <ul tabindex="-1" class="dropdown-content bg-base-200 text-base-content rounded-box z-50 w-52 p-2 shadow-2xl mt-2">
+          <li>
+            <input type="radio" name="theme-dropdown" class="theme-controller w-full btn btn-sm btn-block btn-ghost justify-start" aria-label="Sötét" value="dark" checked />
+          </li>
+          <li>
+            <input type="radio" name="theme-dropdown" class="theme-controller w-full btn btn-sm btn-block btn-ghost justify-start" aria-label="Világos" value="light" />
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 text-base-content/70 text-sm">
+    A diákok sorban jelentkeznek a saját rangsoruk szerint az iskolákhoz. Minden iskola a saját rangsora alapján
+    tartja meg a legjobb jelentkezőket a férőhelyének megfelelően, a többieket visszautasítja.
+    A visszautasított diákok továbblépnek a következő preferenciájukra. A folyamat addig tart, amíg mindenki fel nem vételt nyer, vagy el nem fogynak a lehetőségei.
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap gap-3 items-center mb-3">
+    <button id="btn-start" class="btn btn-success btn-sm">▶ Lejátszás</button>
+    <button id="btn-step" class="btn btn-primary btn-sm">⏭ Következő lépés</button>
+    <button id="btn-reset" class="btn btn-neutral btn-sm">↺ Újraindítás</button>
+    <label class="flex items-center gap-2 text-sm text-base-content/70 ml-auto">
+      Sebesség:
+      <input type="range" id="speed" min="200" max="1500" value="700" class="range range-primary range-sm w-32" style="direction: rtl;">
+    </label>
+    <span class="font-semibold text-primary text-sm ml-auto" id="status-text">Készen áll</span>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap gap-3 text-xs mb-4">
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-base-300 border border-base-content/10"></span> szabad diák</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-warning border border-warning-content"></span> éppen jelentkezik</span>
+    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-success border border-success-content"></span> felvett diák</span>
+  </div>
+
+  <section class="card bg-base-200 shadow-sm max-w-7xl mx-auto px-4 sm:px-6 mb-6">
+    <div class="card-body p-4">
+      <h2 class="card-title text-lg">Diákok (jelentkezők)</h2>
+      <div class="grid grid-cols-7 gap-3" id="students"></div>
+    </div>
+  </section>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+    <section class="card bg-primary/10 border border-primary/30 shadow-sm h-full" id="step-card">
+      <div class="card-body p-4 flex flex-col h-full">
+        <h3 class="card-title text-primary text-base">Mi történik ebben a lépésben?</h3>
+        <div id="step-explanation" class="flex-1 overflow-y-auto">
+          <p class="text-base-content/60 italic">Indítsd el a szimulációt, és itt látni fogod az aktuális lépés részletes magyarázatát: ki jelentkezik hova, miért fogadják el vagy utasítják el, és kik esnek ki a férőhelyekért folyó versenyben.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card bg-base-200 shadow-sm h-full">
+      <div class="card-body p-4 flex flex-col h-full">
+        <h2 class="card-title text-lg">Iskolák (fogadók)</h2>
+        <div class="flex flex-col gap-3" id="schools"></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="hidden max-w-7xl mx-auto px-4 sm:px-6 mb-8" id="summary">
+    <div class="alert alert-success shadow-sm">
+      <div>
+        <h3 class="font-bold text-lg">Az algoritmus befejeződött – stabil párosítás keletkezett</h3>
+        <ul class="mt-2 list-disc list-inside" id="summary-list"></ul>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const STUDENT_NAMES = [
+      "Anna", "Bence", "Csaba", "Dóra", "Eszter",
+      "Ferenc", "Gábor", "Hanna", "István", "Júlia",
+      "Katalin", "László", "Márk", "Noémi", "Olivér",
+      "Péter", "Réka", "Sára", "Tamás", "Viktória",
+      "Zoltán"
+    ];
+    const SCHOOLS_DATA = [
+      { id: 0, name: "Fazekas Mihály Gimnázium", short: "Fazekas", capacity: 5 },
+      { id: 1, name: "Eötvös József Gimnázium", short: "Eötvös", capacity: 5 },
+      { id: 2, name: "Városmajori Gimnázium", short: "Városmajori", capacity: 5 }
+    ];
+
+    function mulberry32(a) {
+      return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    const rand = mulberry32(2024);
+
+    function shuffle(arr, r) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(r() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function weightedPick(r, weights) {
+      const sum = weights.reduce((a, b) => a + b, 0);
+      let x = r() * sum;
+      for (let i = 0; i < weights.length; i++) {
+        x -= weights[i];
+        if (x <= 0) return i;
+      }
+      return weights.length - 1;
+    }
+
+    function generateStudentPreferences() {
+      return STUDENT_NAMES.map((name, i) => {
+        const first = weightedPick(rand, [0.5, 0.3, 0.2]);
+        const rest = shuffle([0, 1, 2].filter(id => id !== first), rand);
+        const prefs = [first, ...rest];
+        return { id: i, name, preferences: prefs, status: "free", nextIndex: 0, matchedSchool: null, proposingTo: null };
+      });
+    }
+
+    function generateSchoolPreferences() {
+      return SCHOOLS_DATA.map(s => ({
+        ...s,
+        preferences: shuffle(STUDENT_NAMES.map((_, i) => i), rand),
+        accepted: []
+      }));
+    }
+
+    let state;
+    let timer = null;
+    let playing = false;
+
+    function init() {
+      state = {
+        students: generateStudentPreferences(),
+        schools: generateSchoolPreferences(),
+        step: 0,
+        finished: false
+      };
+      stopAuto();
+      document.getElementById("summary").classList.add("hidden");
+      document.getElementById("summary-list").innerHTML = "";
+      document.getElementById("step-explanation").innerHTML = `
+        <p class="text-base-content/60 italic">Indítsd el a szimulációt, és itt látni fogod az aktuális lépés részletes magyarázatát: ki jelentkezik hova, miért fogadják el vagy utasítják el, és kik esnek ki a férőhelyekért folyó versenyben.</p>
+      `;
+      document.getElementById("status-text").textContent = "Készen áll";
+      render();
+    }
+
+    function render() {
+      const stuContainer = document.getElementById("students");
+      stuContainer.innerHTML = "";
+      state.students.forEach(s => {
+        const el = document.createElement("div");
+        let cls = "card p-3 text-center text-sm shadow-sm transition-all ";
+        if (s.proposingTo !== null) {
+          cls += "bg-warning text-warning-content ring-2 ring-warning animate-pulse";
+        } else if (s.status === "matched") {
+          cls += "bg-success text-success-content";
+        } else {
+          cls += "bg-base-300 text-base-content";
+        }
+        el.className = cls;
+        const prefs = s.preferences.map((schId, idx) => {
+          let c = "badge badge-xs ";
+          if (idx < s.nextIndex) c += "badge-ghost opacity-50 line-through";
+          else if (idx === s.nextIndex && s.status === "free") c += "badge-primary";
+          else c += "badge-outline";
+          return `<span class="${c}">${SCHOOLS_DATA[schId].short}</span>`;
+        }).join("");
+        let target = "";
+        if (s.matchedSchool !== null) {
+          target = `<div class="text-xs font-bold mt-1">→ ${SCHOOLS_DATA[s.matchedSchool].short}</div>`;
+        } else {
+          target = `<div class="text-xs font-bold mt-1 opacity-70">→</div>`;
+        }
+        el.innerHTML = `<span class="font-bold block">${s.name}</span><div class="flex justify-center gap-1 flex-wrap mt-2">${prefs}</div>${target}`;
+        stuContainer.appendChild(el);
+      });
+
+      const schContainer = document.getElementById("schools");
+      schContainer.innerHTML = "";
+      state.schools.forEach(sch => {
+        const el = document.createElement("div");
+        const isActive = state.students.some(st => st.proposingTo === sch.id);
+        el.className = `card bg-base-100 shadow-sm p-4 border ${isActive ? "border-primary ring-2 ring-primary/20" : "border-base-300"}`;
+
+        const acceptedChips = [];
+        for (let i = 0; i < sch.capacity; i++) {
+          if (i < sch.accepted.length) {
+            const sid = sch.accepted[i];
+            acceptedChips.push(`<span class="badge badge-success">${state.students[sid].name}</span>`);
+          } else {
+            acceptedChips.push(`<span class="badge badge-ghost border-dashed">üres hely</span>`);
+          }
+        }
+        const ranking = sch.preferences.map((sid, idx) => `${idx + 1}. ${state.students[sid].name}`).join(", ");
+        el.innerHTML = `
+          <div class="flex justify-between items-baseline mb-2">
+            <span class="font-bold">${sch.name}</span>
+            <span class="text-xs text-base-content/60">férőhely: ${sch.capacity}</span>
+          </div>
+          <div class="flex flex-wrap gap-2 min-h-[2.5rem] items-center p-2 bg-base-200 rounded-lg mb-2">${acceptedChips.join("")}</div>
+          <div class="text-xs text-base-content/60 max-h-16 overflow-y-auto border-t border-base-300 pt-2"><strong>Iskola rangsora:</strong> ${ranking}</div>
+        `;
+        schContainer.appendChild(el);
+      });
+
+      if (state.finished) {
+        document.getElementById("status-text").textContent = `Befejezve (${state.step} lépés)`;
+      } else {
+        const remaining = state.students.filter(s => s.status === "free" && s.nextIndex < s.preferences.length).length;
+        document.getElementById("status-text").textContent = `Szabad diákok: ${remaining} | Lépés: ${state.step}`;
+      }
+    }
+
+    function doStep() {
+      if (state.finished) return false;
+
+      const studentIdx = state.students.findIndex(s => s.status === "free" && s.nextIndex < s.preferences.length);
+      if (studentIdx === -1) {
+        finish();
+        return false;
+      }
+
+      const student = state.students[studentIdx];
+      const schoolId = student.preferences[student.nextIndex];
+      const school = state.schools[schoolId];
+
+      student.proposingTo = schoolId;
+      render();
+
+      state.step++;
+
+      const beforeAccepted = [...school.accepted];
+      const candidates = [...beforeAccepted, student.id];
+      candidates.sort((a, b) => school.preferences.indexOf(a) - school.preferences.indexOf(b));
+      const newAccepted = candidates.slice(0, school.capacity);
+      const rejected = candidates.slice(school.capacity);
+
+      school.accepted = newAccepted;
+      student.nextIndex++;
+
+      rejected.forEach(id => {
+        const st = state.students[id];
+        st.status = "free";
+        st.matchedSchool = null;
+        st.proposingTo = null;
+      });
+
+      newAccepted.forEach(id => {
+        const st = state.students[id];
+        st.status = "matched";
+        st.matchedSchool = schoolId;
+        st.proposingTo = null;
+      });
+
+      updateStepCard(student, school, beforeAccepted, candidates, newAccepted, rejected);
+
+      student.proposingTo = null;
+      render();
+
+      const hasFree = state.students.some(s => s.status === "free" && s.nextIndex < s.preferences.length);
+      if (!hasFree) {
+        finish();
+      }
+      return true;
+    }
+
+    function finish() {
+      state.finished = true;
+      stopAuto();
+      document.getElementById("step-explanation").innerHTML = `
+        <p><span class="font-bold text-primary">Az algoritmus befejeződött.</span> Stabil párosítás alakult ki: senki sem tud úgy javítani a helyzetén, hogy egy másik fél rosszabbul járjon.</p>
+        <p class="mt-1">A végeredményt az alsó összesítőben nézheted meg.</p>
+      `;
+      showSummary();
+      render();
+    }
+
+    function updateStepCard(student, school, beforeAccepted, candidates, newAccepted, rejected) {
+      const container = document.getElementById("step-explanation");
+      const choiceNum = student.nextIndex;
+      const beforeCount = beforeAccepted.length;
+
+      let html = `
+        <p><span class="font-bold text-primary">${student.name}</span> a ${choiceNum}. választásaként a(z) 
+        <span class="font-bold text-primary">${school.name}</span> iskolába jelentkezett.</p>
+        <p>Az iskolának ${school.capacity} férőhelye van; a jelentkezés előtt ${beforeCount} diák állt felvételi státuszban itt.</p>
+      `;
+
+      if (candidates.length <= school.capacity) {
+        html += `<p>Mivel összesen ${candidates.length} jelentkező van a ${school.capacity} férőhelyre, <span class="font-bold text-primary">mindenkit felvesznek</span>, így ${student.name} is bekerült.</p>`;
+      } else {
+        html += `<p>Az iskola a saját rangsora alapján sorba állítja a jelentkezőket, és megtartja a ${school.capacity} legjobbat:</p><ul class="list-disc list-inside my-1">`;
+        candidates.forEach((id, idx) => {
+          const rank = school.preferences.indexOf(id) + 1;
+          const inAccepted = newAccepted.includes(id);
+          html += `<li>${idx + 1}. <span class="${inAccepted ? 'text-success font-semibold' : 'text-error font-semibold'}">${state.students[id].name}</span> (iskolai rangsor: ${rank}. hely) — ${inAccepted ? 'felvételt nyer' : 'kiesik'}</li>`;
+        });
+        html += `</ul>`;
+
+        if (newAccepted.includes(student.id)) {
+          const displaced = rejected.filter(id => beforeAccepted.includes(id)).map(id => state.students[id].name);
+          html += `<p><span class="font-bold text-primary">${student.name}</span> bekerült, mert az iskola rangsorában előrébb áll${displaced.length ? `, és kiszorította: ${displaced.join(", ")}` : '.'}</p>`;
+        } else {
+          html += `<p><span class="font-bold text-primary">${student.name}</span> nem került be, mert az iskola már tele van nála előrébb rangsorolt diákokkal.</p>`;
+        }
+      }
+
+      container.innerHTML = html;
+    }
+
+    function showSummary() {
+      const list = document.getElementById("summary-list");
+      list.innerHTML = "";
+      state.schools.forEach(sch => {
+        const names = sch.accepted.map(id => state.students[id].name).join(", ");
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${sch.name}</strong>: ${names || "—"}`;
+        list.appendChild(li);
+      });
+      const unmatched = state.students.filter(s => s.status !== "matched");
+      if (unmatched.length) {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>Be nem osztott diákok:</strong> ${unmatched.map(s => s.name).join(", ")}`;
+        list.appendChild(li);
+      }
+      document.getElementById("summary").classList.remove("hidden");
+    }
+
+    function toggleAuto() {
+      if (playing) { stopAuto(); return; }
+      if (state.finished) { init(); }
+      playing = true;
+      document.getElementById("btn-start").textContent = "⏸ Szünet";
+      runLoop();
+    }
+
+    function stopAuto() {
+      playing = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      document.getElementById("btn-start").textContent = "▶ Lejátszás";
+    }
+
+    function runLoop() {
+      if (!playing || state.finished) return;
+      const ok = doStep();
+      if (ok && playing) {
+        const speed = parseInt(document.getElementById("speed").value, 10);
+        timer = setTimeout(runLoop, speed);
+      }
+    }
+
+    document.getElementById("btn-step").addEventListener("click", () => {
+      stopAuto();
+      doStep();
+    });
+    document.getElementById("btn-start").addEventListener("click", toggleAuto);
+    document.getElementById("btn-reset").addEventListener("click", init);
+    document.getElementById("speed").addEventListener("input", () => {
+      if (playing) { stopAuto(); toggleAuto(); }
+    });
+    document.querySelectorAll('input[name="theme-dropdown"]').forEach(radio => {
+      radio.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          document.body.setAttribute("data-theme", e.target.value);
+        }
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>
